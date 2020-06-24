@@ -10,3 +10,8 @@ backup
 weights/*.weights
 __pycache__
 checkpoints
+
+
+data
+*.pkl
+events.out.tfevents.*

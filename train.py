@@ -9,6 +9,7 @@ from test import evaluate
 
 from terminaltables import AsciiTable
 
+from dataset.base import Base as DatasetBase
 import os
 import sys
 import time
@@ -64,16 +65,12 @@ if __name__ == "__main__":
             model.load_darknet_weights(opt.pretrained_weights)
 
     # Get dataloader
-    dataset = ListDataset(train_path, augment=True, multiscale=opt.multiscale_training)
-    dataloader = torch.utils.data.DataLoader(
-        dataset,
-        batch_size=opt.batch_size,
-        shuffle=True,
-        num_workers=opt.n_cpu,
-        pin_memory=True,
-        collate_fn=dataset.collate_fn,
-    )
+    dataset = DatasetBase.from_name('tiny-person')('data', DatasetBase.Mode.TRAIN, None, None)
+    # dataset = ListDataset(train_path, augment=True, multiscale=opt.multiscale_training)
 
+    dataloader = DataLoader(dataset, batch_size=opt.batch_size,
+                    sampler=DatasetBase.NearestRatioRandomSampler(dataset.image_ratios, num_neighbors=opt.batch_size),
+                    num_workers=0, collate_fn=dataset.collate_fn, pin_memory=True)
     optimizer = torch.optim.Adam(model.parameters())
 
     metrics = [
@@ -96,14 +93,18 @@ if __name__ == "__main__":
     for epoch in range(opt.epochs):
         model.train()
         start_time = time.time()
-        for batch_i, (_, imgs, targets) in enumerate(dataloader):
-            batches_done = len(dataloader) * epoch + batch_i
+        for batch_id, (imgs, targets) in enumerate(dataloader):
+            batches_done = len(dataloader) * epoch + batch_id
+            # labels = labels.unsqueeze(dim=-1).to(torch.float32)
+            # iid = torch.FloatTensor(iid).view(-1, 1, 1).repeat(1, labels.size(1), labels.size(2))
+            # targets = torch.cat((iid, labels, bboxes), dim=-1)
 
-            imgs = Variable(imgs.to(device))
-            targets = Variable(targets.to(device), requires_grad=False)
+            imgs = imgs.to(device)
+            targets = targets.to(device)
 
             loss, outputs = model(imgs, targets)
             loss.backward()
+            torch.cuda.empty_cache()
 
             if batches_done % opt.gradient_accumulations:
                 # Accumulates gradient before each step
@@ -114,7 +115,7 @@ if __name__ == "__main__":
             #   Log progress
             # ----------------
 
-            log_str = "\n---- [Epoch %d/%d, Batch %d/%d] ----\n" % (epoch, opt.epochs, batch_i, len(dataloader))
+            log_str = "\n---- [Epoch %d/%d, Batch %d/%d] ----\n" % (epoch, opt.epochs, batch_id, len(dataloader))
 
             metric_table = [["Metrics", *[f"YOLO Layer {i}" for i in range(len(model.yolo_layers))]]]
 
@@ -133,46 +134,46 @@ if __name__ == "__main__":
                         if name != "grid_size":
                             tensorboard_log += [(f"{name}_{j+1}", metric)]
                 tensorboard_log += [("loss", loss.item())]
-                logger.list_of_scalars_summary(tensorboard_log, batches_done)
+                # logger.list_of_scalars_summary(tensorboard_log, batches_done)
 
             log_str += AsciiTable(metric_table).table
             log_str += f"\nTotal loss {loss.item()}"
 
             # Determine approximate time left for epoch
-            epoch_batches_left = len(dataloader) - (batch_i + 1)
-            time_left = datetime.timedelta(seconds=epoch_batches_left * (time.time() - start_time) / (batch_i + 1))
+            epoch_batches_left = len(dataloader) - (batch_id + 1)
+            time_left = datetime.timedelta(seconds=epoch_batches_left * (time.time() - start_time) / (batch_id + 1))
             log_str += f"\n---- ETA {time_left}"
 
             print(log_str)
 
             model.seen += imgs.size(0)
 
-        if epoch % opt.evaluation_interval == 0:
-            print("\n---- Evaluating Model ----")
-            # Evaluate the model on the validation set
-            precision, recall, AP, f1, ap_class = evaluate(
-                model,
-                path=valid_path,
-                iou_thres=0.5,
-                conf_thres=0.5,
-                nms_thres=0.5,
-                img_size=opt.img_size,
-                batch_size=8,
-            )
-            evaluation_metrics = [
-                ("val_precision", precision.mean()),
-                ("val_recall", recall.mean()),
-                ("val_mAP", AP.mean()),
-                ("val_f1", f1.mean()),
-            ]
-            logger.list_of_scalars_summary(evaluation_metrics, epoch)
+        # if epoch % opt.evaluation_interval == 0:
+        #     print("\n---- Evaluating Model ----")
+        #     # Evaluate the model on the validation set
+        #     precision, recall, AP, f1, ap_class = evaluate(
+        #         model,
+        #         path=valid_path,
+        #         iou_thres=0.5,
+        #         conf_thres=0.5,
+        #         nms_thres=0.5,
+        #         img_size=opt.img_size,
+        #         batch_size=8,
+        #     )
+        #     evaluation_metrics = [
+        #         ("val_precision", precision.mean()),
+        #         ("val_recall", recall.mean()),
+        #         ("val_mAP", AP.mean()),
+        #         ("val_f1", f1.mean()),
+        #     ]
+        #     logger.list_of_scalars_summary(evaluation_metrics, epoch)
 
-            # Print class APs and mAP
-            ap_table = [["Index", "Class name", "AP"]]
-            for i, c in enumerate(ap_class):
-                ap_table += [[c, class_names[c], "%.5f" % AP[i]]]
-            print(AsciiTable(ap_table).table)
-            print(f"---- mAP {AP.mean()}")
+        #     # Print class APs and mAP
+        #     ap_table = [["Index", "Class name", "AP"]]
+        #     for i, c in enumerate(ap_class):
+        #         ap_table += [[c, class_names[c], "%.5f" % AP[i]]]
+        #     print(AsciiTable(ap_table).table)
+        #     print(f"---- mAP {AP.mean()}")
 
         if epoch % opt.checkpoint_interval == 0:
             torch.save(model.state_dict(), f"checkpoints/yolov3_ckpt_%d.pth" % epoch)

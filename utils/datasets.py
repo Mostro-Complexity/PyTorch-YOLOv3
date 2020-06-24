@@ -105,17 +105,17 @@ class ListDataset(Dataset):
         targets = None
         if os.path.exists(label_path):
             boxes = torch.from_numpy(np.loadtxt(label_path).reshape(-1, 5))
-            # Extract coordinates for unpadded + unscaled image
+            # Extract coordinates for unpadded + unscaled image (x1, y1, x2, y2) range: 0,1
             x1 = w_factor * (boxes[:, 1] - boxes[:, 3] / 2)
             y1 = h_factor * (boxes[:, 2] - boxes[:, 4] / 2)
             x2 = w_factor * (boxes[:, 1] + boxes[:, 3] / 2)
             y2 = h_factor * (boxes[:, 2] + boxes[:, 4] / 2)
-            # Adjust for added padding
+            # Adjust for added padding (x1, y1, x2, y2) range: normal size
             x1 += pad[0]
             y1 += pad[2]
             x2 += pad[1]
             y2 += pad[3]
-            # Returns (x, y, w, h)
+            # Returns (x, y, w, h)  (x_center, y_center, x2, y2) range: 0,1
             boxes[:, 1] = ((x1 + x2) / 2) / padded_w
             boxes[:, 2] = ((y1 + y2) / 2) / padded_h
             boxes[:, 3] *= w_factor / padded_w
