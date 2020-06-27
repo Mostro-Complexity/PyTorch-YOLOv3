@@ -1,6 +1,6 @@
 from __future__ import division
 
-from models import *
+from models import Darknet, YOLOV3Detector
 from utils.utils import *
 from utils.datasets import *
 from utils.parse_config import *
@@ -10,6 +10,8 @@ from extension.config.yolov3_config import _C as config
 from terminaltables import AsciiTable
 
 from dataset.base import Base as DatasetBase
+from backbone.base import Base as BackboneBase
+from model import YOLOV3
 import os
 import sys
 import time
@@ -82,22 +84,18 @@ if __name__ == "__main__":
     config.freeze()
 
     # Initiate model
-    backbone = Darknet(args.model_def).to(device)
-    backbone.apply(weights_init_normal)
+    backbone = BackboneBase.from_name('darknet53')(pretrained=False, models_dir='')
+    model = YOLOV3(backbone, config.GLOBAL.NUM_CLASSES, config.GLOBAL.ANCHORS, args.model_def, image_size=config.GLOBAL.IMAGE_SIZE[0])
 
-    # Anchor arrangement
-    anchor_group_1, anchor_group_2, anchor_group_3 = group_anchors(config.GLOBAL.ANCHORS, num_groups=3)
-    detector = [
-        YOLOV3Detector(anchor_group_1, config.GLOBAL.NUM_CLASSES, config.GLOBAL.IMAGE_SIZE[0]),
-        YOLOV3Detector(anchor_group_2, config.GLOBAL.NUM_CLASSES, config.GLOBAL.IMAGE_SIZE[0]),
-        YOLOV3Detector(anchor_group_3, config.GLOBAL.NUM_CLASSES, config.GLOBAL.IMAGE_SIZE[0])
-    ]
+    if torch.cuda.is_available():
+        model = model.cuda()
+
     # If specified we start from checkpoint
-    if config.TRAIN.PRETRAINED_WEIGHTS is not None and config.TRAIN.PRETRAINED_WEIGHTS != '':
-        if config.TRAIN.PRETRAINED_WEIGHTS.endswith(".pth"):
-            backbone.load_state_dict(torch.load(config.TRAIN.PRETRAINED_WEIGHTS))
-        else:
-            backbone.load_darknet_weights(config.TRAIN.PRETRAINED_WEIGHTS)
+    # if config.TRAIN.PRETRAINED_WEIGHTS is not None and config.TRAIN.PRETRAINED_WEIGHTS != '':
+    #     if config.TRAIN.PRETRAINED_WEIGHTS.endswith(".pth"):
+    #         backbone.load_state_dict(torch.load(config.TRAIN.PRETRAINED_WEIGHTS))
+    #     else:
+    #         backbone.load_darknet_weights(config.TRAIN.PRETRAINED_WEIGHTS)
 
     # Get dataloader
     dataset = DatasetBase.from_name('tiny-person')(
@@ -108,7 +106,7 @@ if __name__ == "__main__":
         sampler=DatasetBase.NearestRatioRandomSampler(dataset.image_ratios, num_neighbors=config.TRAIN.BATCH_SIZE),
         num_workers=config.TRAIN.NUM_WORKERS, collate_fn=dataset.collate_fn, pin_memory=True
     )
-    optimizer = torch.optim.Adam(backbone.parameters())
+    optimizer = torch.optim.Adam(model.parameters())
 
     metrics = [
         "grid_size",
@@ -128,7 +126,7 @@ if __name__ == "__main__":
     ]
 
     for epoch in range(config.TRAIN.EPOCHS):
-        backbone.train()
+        model.train()
         start_time = time.time()
         for batch_id, (imgs, targets) in enumerate(dataloader):
             batches_done = len(dataloader) * epoch + batch_id
@@ -136,11 +134,7 @@ if __name__ == "__main__":
             imgs = imgs.to(device)
             targets = targets.to(device)
 
-            multiscale_features = backbone(imgs, targets)
-
-            loss = detector[0](multiscale_features[0], targets, 416)
-            loss += detector[1](multiscale_features[1], targets, 416)
-            loss += detector[2](multiscale_features[2], targets, 416)
+            loss = model(imgs, targets)
 
             loss.backward()
             torch.cuda.empty_cache()
@@ -156,19 +150,19 @@ if __name__ == "__main__":
 
             log_str = "\n---- [Epoch %d/%d, Batch %d/%d] ----\n" % (epoch, config.TRAIN.EPOCHS, batch_id, len(dataloader))
 
-            metric_table = [["Metrics", *[f"YOLO Layer {i}" for i in range(len(backbone.yolo_layers))]]]
+            metric_table = [["Metrics", *[f"YOLO Layer {i}" for i in range(len(model.detections))]]]
 
             # Log metrics at each YOLO layer
             for i, metric in enumerate(metrics):
                 formats = {m: "%.6f" for m in metrics}
                 formats["grid_size"] = "%2d"
                 formats["cls_acc"] = "%.2f%%"
-                row_metrics = [formats[metric] % yolo.metrics.get(metric, 0) for yolo in detector]
+                row_metrics = [formats[metric] % detection.metrics.get(metric, 0) for detection in model.detections]
                 metric_table += [[metric, *row_metrics]]
 
                 # Tensorboard logging
                 tensorboard_log = []
-                for j, yolo in enumerate(backbone.yolo_layers):
+                for j, yolo in enumerate(model.feature.yolo_layers):
                     for name, metric in yolo.metrics.items():
                         if name != "grid_size":
                             tensorboard_log += [(f"{name}_{j+1}", metric)]
@@ -185,7 +179,7 @@ if __name__ == "__main__":
 
             print(log_str)
 
-            backbone.seen += imgs.size(0)
+            model.feature.seen += imgs.size(0)
 
         # if epoch % opt.evaluation_interval == 0:
         #     print("\n---- Evaluating Model ----")
@@ -215,4 +209,4 @@ if __name__ == "__main__":
         #     print(f"---- mAP {AP.mean()}")
 
         if epoch % config.TRAIN.CHECKPOINT_INTERVAL == 0:
-            torch.save(backbone.state_dict(), f"checkpoints/yolov3_ckpt_%d.pth" % epoch)
+            torch.save(model.state_dict(), f"checkpoints/yolov3_ckpt_%d.pth" % epoch)
