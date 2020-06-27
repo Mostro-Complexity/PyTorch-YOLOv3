@@ -1,0 +1,33 @@
+GLOBAL:
+  ANCHORS:
+  - 29
+  - 13
+  - 14
+  - 30
+  - 22
+  - 18
+  - 30
+  - 11
+  - 12
+  - 25
+  - 29
+  - 39
+  - 60
+  - 38
+  - 36
+  - 68
+  - 57
+  - 52
+  IMAGE_SIZE:
+  - 416
+  - 416
+  NUM_CLASSES: 3
+TRAIN:
+  BATCH_SIZE: 8
+  CHECKPOINT_INTERVAL: 10
+  EPOCHS: 100
+  EVALUATION_INTERVAL: 10
+  GRADIENT_ACCUMULATIONS: 2
+  NUM_GPUS: 4
+  NUM_WORKERS: 4
+  PRETRAINED_WEIGHTS: ''

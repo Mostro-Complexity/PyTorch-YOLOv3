@@ -9,7 +9,12 @@
             "type": "python",
             "request": "launch",
             "program": "${workspaceRoot}/train.py",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "args": [
+                "--num_workers=4",
+                "--num_classes=3",
+                "--config=yolov3-config-tiny-persion.yaml"
+            ]
         }
     ]
 }
