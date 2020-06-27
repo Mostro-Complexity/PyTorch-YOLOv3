@@ -46,11 +46,10 @@ class Base(torch.utils.data.dataset.Dataset):
         else:
             raise ValueError
 
-    def __init__(self, path_to_data_dir: str, mode: Mode, image_min_side: float, image_max_side: float):
+    def __init__(self, path_to_data_dir: str, mode: Mode):
         self._path_to_data_dir = path_to_data_dir
         self._mode = mode
-        self._image_min_side = image_min_side
-        self._image_max_side = image_max_side
+
 
     def __len__(self) -> int:
         raise NotImplementedError

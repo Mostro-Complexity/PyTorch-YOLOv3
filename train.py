@@ -68,11 +68,14 @@ if __name__ == "__main__":
             backbone.load_darknet_weights(args.pretrained_weights)
 
     # Get dataloader
-    dataset = DatasetBase.from_name('tiny-person')('data', DatasetBase.Mode.TRAIN, None, None)
+    dataset = DatasetBase.from_name('tiny-person')(
+        'data/tiny_set/train', 'data/tiny_set/erase_with_uncertain_dataset/annotations/corner/task/tiny_set_train_sw640_sh512_all.json', DatasetBase.Mode.TRAIN)
 
-    dataloader = DataLoader(dataset, batch_size=args.batch_size,
-                            sampler=DatasetBase.NearestRatioRandomSampler(dataset.image_ratios, num_neighbors=args.batch_size),
-                            num_workers=args.num_workers, collate_fn=dataset.collate_fn, pin_memory=True)
+    dataloader = DataLoader(
+        dataset, batch_size=args.batch_size,
+        sampler=DatasetBase.NearestRatioRandomSampler(dataset.image_ratios, num_neighbors=args.batch_size),
+        num_workers=args.num_workers, collate_fn=dataset.collate_fn, pin_memory=True
+    )
     optimizer = torch.optim.Adam(backbone.parameters())
 
     metrics = [

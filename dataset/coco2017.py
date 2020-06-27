@@ -62,7 +62,9 @@ class COCO2017(Base):
     LABEL_TO_CATEGORY_DICT = {v: k for k, v in CATEGORY_TO_LABEL_DICT.items()}
 
     def __init__(self, path_to_data_dir: str, mode: Base.Mode, image_min_side: float, image_max_side: float):
-        super().__init__(path_to_data_dir, mode, image_min_side, image_max_side)
+        super().__init__(path_to_data_dir, mode)
+        self._image_min_side = image_min_side
+        self._image_max_side = image_max_side
 
         path_to_coco_dir = os.path.join(self._path_to_data_dir, 'COCO')
         path_to_annotations_dir = os.path.join(path_to_coco_dir, 'annotations')
