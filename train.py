@@ -23,6 +23,33 @@ from torchvision import transforms
 from torch.autograd import Variable
 import torch.optim as optim
 
+
+def setup_config(config, args):
+
+    config.GLOBAL.IMAGE_SIZE = (args.image_size, args.image_size)
+    config.GLOBAL.NUM_CLASSES = args.num_classes
+
+    config.TRAIN.NUM_WORKERS = args.num_workers
+
+    config.TRAIN.EPOCHS = args.epochs
+    config.TRAIN.BATCH_SIZE = args.batch_size
+    config.TRAIN.GRADIENT_ACCUMULATIONS = args.gradient_accumulations
+
+    config.TRAIN.PRETRAINED_WEIGHTS = args.pretrained_weights
+
+    config.TRAIN.CHECKPOINT_INTERVAL = args.checkpoint_interval
+    config.TRAIN.EVALUATION_INTERVAL = args.evaluation_interval
+
+    config.TRAIN.PATH_TO_IMAGES_DIR = args.training_images_dir_path
+    config.TRAIN.PATH_TO_ANNOTATIONS = args.training_annotations_path
+
+    config.EVAL.BATCH_SIZE = args.batch_size
+    config.EVAL.NUM_WORKERS = args.num_workers
+    config.EVAL.PATH_TO_IMAGES_DIR = args.evaluating_images_dir_path
+    config.EVAL.PATH_TO_ANNOTATIONS = args.evaluating_annotations_path
+    return config
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs", type=int, default=100, help="number of epochs")
@@ -30,7 +57,7 @@ if __name__ == "__main__":
     parser.add_argument("--gradient_accumulations", type=int, default=2, help="number of gradient accums before step")
     parser.add_argument("--model_def", type=str, default="config/yolov3.cfg", help="path to model definition file")
     parser.add_argument("--config", type=str, required=True, help="path to data config file")
-    parser.add_argument("--pretrained_weights", type=str, help="if specified starts from checkpoint model")
+    parser.add_argument("--pretrained_weights", type=str, default='', help="if specified starts from checkpoint model")
     parser.add_argument("--num_workers", type=int, default=8, help="number of cpu threads to use during batch generation")
     parser.add_argument("--num_classes", type=int, default=80, help="number of classes in dataset")
     parser.add_argument("--image_size", type=int, default=416, help="size of each image dimension")
@@ -38,8 +65,11 @@ if __name__ == "__main__":
     parser.add_argument("--evaluation_interval", type=int, default=10, help="interval evaluations on validation set")
     parser.add_argument("--compute_map", default=False, help="if True computes mAP every tenth batch")
     parser.add_argument("--multiscale_training", default=True, help="allow for multi-scale training")
+    parser.add_argument("--training_images_dir_path", default='data/train', type=str, help="path of folder for storing images in the data set")
+    parser.add_argument("--training_annotations_path", default='data/annotations', type=str, help="path for storing label files in the data set")
+    parser.add_argument("--evaluating_images_dir_path", default='data/val', type=str, help="path of folder for storing images in the data set")
+    parser.add_argument("--evaluating_annotations_path", default='data/annotations', type=str, help="path for storing label files in the data set")
     args = parser.parse_args()
-    print(args)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -48,6 +78,8 @@ if __name__ == "__main__":
 
     # Get data configuration
     config.merge_from_file(args.config)
+    config = setup_config(config, args)
+    config.freeze()
 
     # Initiate model
     backbone = Darknet(args.model_def).to(device)
@@ -61,20 +93,20 @@ if __name__ == "__main__":
         YOLOV3Detector(anchor_group_3, config.GLOBAL.NUM_CLASSES, config.GLOBAL.IMAGE_SIZE[0])
     ]
     # If specified we start from checkpoint
-    if args.pretrained_weights:
-        if args.pretrained_weights.endswith(".pth"):
-            backbone.load_state_dict(torch.load(args.pretrained_weights))
+    if config.TRAIN.PRETRAINED_WEIGHTS is not None and config.TRAIN.PRETRAINED_WEIGHTS != '':
+        if config.TRAIN.PRETRAINED_WEIGHTS.endswith(".pth"):
+            backbone.load_state_dict(torch.load(config.TRAIN.PRETRAINED_WEIGHTS))
         else:
-            backbone.load_darknet_weights(args.pretrained_weights)
+            backbone.load_darknet_weights(config.TRAIN.PRETRAINED_WEIGHTS)
 
     # Get dataloader
     dataset = DatasetBase.from_name('tiny-person')(
-        'data/tiny_set/train', 'data/tiny_set/erase_with_uncertain_dataset/annotations/corner/task/tiny_set_train_sw640_sh512_all.json', DatasetBase.Mode.TRAIN)
+        config.TRAIN.PATH_TO_IMAGES_DIR, config.TRAIN.PATH_TO_ANNOTATIONS, DatasetBase.Mode.TRAIN)
 
     dataloader = DataLoader(
-        dataset, batch_size=args.batch_size,
-        sampler=DatasetBase.NearestRatioRandomSampler(dataset.image_ratios, num_neighbors=args.batch_size),
-        num_workers=args.num_workers, collate_fn=dataset.collate_fn, pin_memory=True
+        dataset, batch_size=config.TRAIN.BATCH_SIZE,
+        sampler=DatasetBase.NearestRatioRandomSampler(dataset.image_ratios, num_neighbors=config.TRAIN.BATCH_SIZE),
+        num_workers=config.TRAIN.NUM_WORKERS, collate_fn=dataset.collate_fn, pin_memory=True
     )
     optimizer = torch.optim.Adam(backbone.parameters())
 
@@ -95,7 +127,7 @@ if __name__ == "__main__":
         "conf_noobj",
     ]
 
-    for epoch in range(args.epochs):
+    for epoch in range(config.TRAIN.EPOCHS):
         backbone.train()
         start_time = time.time()
         for batch_id, (imgs, targets) in enumerate(dataloader):
@@ -113,7 +145,7 @@ if __name__ == "__main__":
             loss.backward()
             torch.cuda.empty_cache()
 
-            if batches_done % args.gradient_accumulations:
+            if batches_done % config.TRAIN.GRADIENT_ACCUMULATIONS:
                 # Accumulates gradient before each step
                 optimizer.step()
                 optimizer.zero_grad()
@@ -122,7 +154,7 @@ if __name__ == "__main__":
             #   Log progress
             # ----------------
 
-            log_str = "\n---- [Epoch %d/%d, Batch %d/%d] ----\n" % (epoch, args.epochs, batch_id, len(dataloader))
+            log_str = "\n---- [Epoch %d/%d, Batch %d/%d] ----\n" % (epoch, config.TRAIN.EPOCHS, batch_id, len(dataloader))
 
             metric_table = [["Metrics", *[f"YOLO Layer {i}" for i in range(len(backbone.yolo_layers))]]]
 
@@ -182,5 +214,5 @@ if __name__ == "__main__":
         #     print(AsciiTable(ap_table).table)
         #     print(f"---- mAP {AP.mean()}")
 
-        if epoch % args.checkpoint_interval == 0:
+        if epoch % config.TRAIN.CHECKPOINT_INTERVAL == 0:
             torch.save(backbone.state_dict(), f"checkpoints/yolov3_ckpt_%d.pth" % epoch)

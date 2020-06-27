@@ -20,6 +20,17 @@ _C.TRAIN.PRETRAINED_WEIGHTS = ""
 _C.TRAIN.CHECKPOINT_INTERVAL = 10
 _C.TRAIN.EVALUATION_INTERVAL = 10
 
+_C.TRAIN.PATH_TO_IMAGES_DIR = 'data/train'
+_C.TRAIN.PATH_TO_ANNOTATIONS = 'data/annotations'
+
+_C.EVAL = CN()
+_C.EVAL.BATCH_SIZE = 8
+_C.EVAL.NUM_WORKERS = 4
+_C.EVAL.PATH_TO_IMAGES_DIR = 'data/val'
+_C.EVAL.PATH_TO_ANNOTATIONS = 'data/annotations'
+_C.EVAL.PATH_TO_CHECKPOINT = 'checkpoints/tiny-person/yolov3_ckpt_99.pth'
+
+
 
 def get_cfg_defaults():
     return _C.clone()

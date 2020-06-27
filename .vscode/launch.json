@@ -13,6 +13,20 @@
             "args": [
                 "--num_workers=4",
                 "--num_classes=3",
+                "--config=yolov3-config-tiny-persion.yaml",
+                "--training_images_dir_path=data/tiny_set/erase_with_uncertain_dataset/train",
+                "--training_annotations_path=data/tiny_set/erase_with_uncertain_dataset/annotations/corner/task/tiny_set_train_sw640_sh512_all.json"
+            ]
+        },
+        {
+            "name": "Testing",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/test.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--num_workers=0",
+                "--num_classes=3",
                 "--config=yolov3-config-tiny-persion.yaml"
             ]
         }
