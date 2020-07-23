@@ -181,32 +181,33 @@ if __name__ == "__main__":
 
             model.feature.seen += imgs.size(0)
 
-        # if epoch % opt.evaluation_interval == 0:
-        #     print("\n---- Evaluating Model ----")
-        #     # Evaluate the model on the validation set
-        #     precision, recall, AP, f1, ap_class = evaluate(
-        #         model,
-        #         path=valid_path,
-        #         iou_thres=0.5,
-        #         conf_thres=0.5,
-        #         nms_thres=0.5,
-        #         img_size=opt.img_size,
-        #         batch_size=8,
-        #     )
-        #     evaluation_metrics = [
-        #         ("val_precision", precision.mean()),
-        #         ("val_recall", recall.mean()),
-        #         ("val_mAP", AP.mean()),
-        #         ("val_f1", f1.mean()),
-        #     ]
-        #     logger.list_of_scalars_summary(evaluation_metrics, epoch)
+        if epoch % config.TRAIN.EVALUATION_INTERVAL == 0:
+            # Evaluate the model on the validation set
+            precision, recall, AP, f1, ap_class = evaluate(
+                model,
+                path_to_images_dir=config.EVAL.PATH_TO_IMAGES_DIR,
+                path_to_annotation=config.EVAL.PATH_TO_ANNOTATIONS,
+                iou_thres=0.5,
+                conf_thres=0.5,
+                nms_thres=0.5,
+                img_size=config.GLOBAL.IMAGE_SIZE,
+                batch_size=config.EVAL.BATCH_SIZE,
+                num_workers=config.EVAL.NUM_WORKERS
+            )
+            evaluation_metrics = [
+                ("val_precision", precision.mean()),
+                ("val_recall", recall.mean()),
+                ("val_mAP", AP.mean()),
+                ("val_f1", f1.mean()),
+            ]
+            # logger.list_of_scalars_summary(evaluation_metrics, epoch)
 
-        #     # Print class APs and mAP
-        #     ap_table = [["Index", "Class name", "AP"]]
-        #     for i, c in enumerate(ap_class):
-        #         ap_table += [[c, class_names[c], "%.5f" % AP[i]]]
-        #     print(AsciiTable(ap_table).table)
-        #     print(f"---- mAP {AP.mean()}")
+            # Print class APs and mAP
+            ap_table = [["Index", "Class name", "AP"]]
+            for i, c in enumerate(ap_class):
+                ap_table += [[c, dataset.class_names[c], "%.5f" % AP[i]]]
+            print(AsciiTable(ap_table).table)
+            print(f"---- mAP {AP.mean()}")
 
         if epoch % config.TRAIN.CHECKPOINT_INTERVAL == 0:
             torch.save(model.state_dict(), f"checkpoints/yolov3_ckpt_%d.pth" % epoch)

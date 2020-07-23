@@ -78,6 +78,8 @@ class TinyPerson(Base):
             self._image_id_to_annotation_dict: Dict[str, TinyPerson.Annotation] = {}
             self._image_ratios = []
 
+            self._class_names = [coco_dataset.coco.cats[i + 1]['name'] for i in range(len(coco_dataset.coco.cats))]
+
             for idx, (image, annotation) in enumerate(tqdm(coco_dataset)):
                 if len(annotation) > 0:
                     image_id = annotation[0]['image_id']  # all image_id in annotation are the same
@@ -191,9 +193,13 @@ class TinyPerson(Base):
     def image_ratios(self) -> List[float]:
         return self._image_ratios
 
-    @staticmethod
-    def num_classes() -> int:
-        return 92
+    @property
+    def num_classes(self) -> int:
+        return len(self._class_names)
+
+    @property
+    def class_names(self) -> List[str]:
+        return self._class_names
 
     @staticmethod
     def preprocess(image: Image, pad_value: int, size: Tuple[int, int]) -> Tuple[Tensor, Tuple[int, int, int, int]]:

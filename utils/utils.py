@@ -72,11 +72,11 @@ def ap_per_class(tp, conf, pred_cls, target_cls):
     """
 
     # Sort by objectness
-    i = np.argsort(-conf)
+    i = torch.argsort(-conf)
     tp, conf, pred_cls = tp[i], conf[i], pred_cls[i]
 
     # Find unique classes
-    unique_classes = np.unique(target_cls)
+    unique_classes = torch.unique(target_cls).int()
 
     # Create Precision-Recall curve and compute AP for each class
     ap, p, r = [], [], []
@@ -108,10 +108,10 @@ def ap_per_class(tp, conf, pred_cls, target_cls):
             ap.append(compute_ap(recall_curve, precision_curve))
 
     # Compute F1 score (harmonic mean of precision and recall)
-    p, r, ap = np.array(p), np.array(r), np.array(ap)
+    p, r, ap = torch.tensor(p), torch.tensor(r), torch.tensor(ap)
     f1 = 2 * p * r / (p + r + 1e-16)
 
-    return p, r, ap, f1, unique_classes.astype("int32")
+    return p, r, ap, f1, unique_classes
 
 
 def compute_ap(recall, precision):
@@ -155,7 +155,7 @@ def get_batch_statistics(outputs, targets, iou_threshold):
         pred_scores = output[:, 4]
         pred_labels = output[:, -1]
 
-        true_positives = np.zeros(pred_boxes.shape[0])
+        true_positives = torch.zeros(pred_boxes.shape[0])
 
         annotations = targets[targets[:, 0] == sample_i][:, 1:]
         target_labels = annotations[:, 0] if len(annotations) else []

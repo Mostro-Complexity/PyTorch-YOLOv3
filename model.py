@@ -43,12 +43,12 @@ class YOLOV3(nn.Module):
     def forward(self, image_batch: Tensor, targets_batch: Tensor = None) -> Union[Tuple[Tensor, Tensor, Tensor, Tensor],
                                                                                   Tuple[Tensor, Tensor, Tensor, Tensor]]:
 
+        cascaded_scale_features = self.feature(image_batch, targets_batch)
         if self.training:
-            cascaded_scale_features = self.feature(image_batch, targets_batch)
             total_losses = [detection(cascaded_scale_features[i], targets_batch) for i, detection in enumerate(self.detections)]
             return torch.stack(total_losses).sum()
         else:
-            output = self.detections(image_batch)
+            output = torch.cat([detection(cascaded_scale_features[i], targets_batch) for i, detection in enumerate(self.detections)], dim=1)
             return output
 
     def save(self, path_to_checkpoints_dir: str, step: int, optimizer: Optimizer, scheduler: _LRScheduler) -> str:
