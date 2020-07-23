@@ -34,10 +34,11 @@ class TinyPerson(Base):
                 return 'Object[label={:d}, bbox={!s}]'.format(
                     self.label, self.bbox)
 
-        def __init__(self, filename: str, objects: List[Object]):
+        def __init__(self, filename: str, objects: List[Object], corner: BBox):
             super().__init__()
             self.filename = filename
             self.objects = objects
+            self.corner = corner
 
     def __init__(self, path_to_jpeg_images_dir: str, path_to_annotations: str, mode: Base.Mode):
         path_to_data_dir = os.path.dirname(path_to_jpeg_images_dir)
@@ -81,9 +82,9 @@ class TinyPerson(Base):
                 if len(annotation) > 0:
                     image_id = annotation[0]['image_id']  # all image_id in annotation are the same
                     self._image_ids.append(image_id)
-                    filename = coco_dataset.coco.loadImgs(image_id)[0]['file_name']
+                    img_info = coco_dataset.coco.loadImgs(image_id)[0]
                     self._image_id_to_annotation_dict[image_id] = TinyPerson.Annotation(
-                        filename=os.path.join(path_to_jpeg_images_dir, filename),
+                        filename=os.path.join(path_to_jpeg_images_dir, img_info['file_name']),
                         objects=[TinyPerson.Annotation.Object(
                             bbox=BBox(  # `ann['bbox']` is in the format [left, top, width, height]
                                 left=ann['bbox'][0],
@@ -92,7 +93,13 @@ class TinyPerson(Base):
                                 bottom=ann['bbox'][1] + ann['bbox'][3]
                             ),
                             label=ann['category_id'])
-                            for ann in annotation]
+                            for ann in annotation],
+                        corner=BBox(
+                            left=img_info['corner'][0],
+                            top=img_info['corner'][1],
+                            right=img_info['corner'][2],
+                            bottom=img_info['corner'][3]
+                        )
                     )
 
                     ratio = float(image.width / image.height)
@@ -121,6 +128,7 @@ class TinyPerson(Base):
         labels = torch.tensor(labels, dtype=torch.long)
 
         image = Image.open(annotation.filename).convert('RGB')  # for some grayscale images
+        image = image.crop(annotation.corner.tolist())
         image_size = image.size
         # random flip on only training mode
         if self._mode == TinyPerson.Mode.TRAIN and random.random() > 0.5:
