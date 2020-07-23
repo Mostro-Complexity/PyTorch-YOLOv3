@@ -210,3 +210,6 @@ if __name__ == "__main__":
 
         if epoch % config.TRAIN.CHECKPOINT_INTERVAL == 0:
             torch.save(model.state_dict(), f"checkpoints/yolov3_ckpt_%d.pth" % epoch)
+    
+    # final model saving
+    torch.save(model.state_dict(), f"checkpoints/yolov3_ckpt_%d.pth" % epoch)
