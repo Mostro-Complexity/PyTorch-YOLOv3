@@ -1,0 +1,41 @@
+EVAL:
+  BATCH_SIZE: 8
+  NUM_WORKERS: 4
+  PATH_TO_ANNOTATIONS: data/tiny_set/erase_with_uncertain_dataset/annotations/corner/task/tiny_set_train_sw640_sh512_all.json
+  PATH_TO_CHECKPOINT: checkpoints/tiny-person/yolov3_ckpt_99.pth
+  PATH_TO_IMAGES_DIR: data/tiny_set/erase_with_uncertain_dataset/train
+GLOBAL:
+  ANCHORS:
+  - 8
+  - 10
+  - 18
+  - 22
+  - 25
+  - 43
+  - 53
+  - 33
+  - 39
+  - 72
+  - 99
+  - 69
+  - 57
+  - 119
+  - 105
+  - 171
+  - 235
+  - 52
+  IMAGE_SIZE:
+  - 416
+  - 416
+  NUM_CLASSES: 3
+TRAIN:
+  BATCH_SIZE: 8
+  CHECKPOINT_INTERVAL: 10
+  EPOCHS: 100
+  EVALUATION_INTERVAL: 10
+  GRADIENT_ACCUMULATIONS: 2
+  NUM_GPUS: 4
+  NUM_WORKERS: 4
+  PATH_TO_ANNOTATIONS: data/tiny_set/erase_with_uncertain_dataset/annotations/corner/task/tiny_set_train_sw640_sh512_all.json
+  PATH_TO_IMAGES_DIR: data/tiny_set/erase_with_uncertain_dataset/train
+  PRETRAINED_WEIGHTS: ''

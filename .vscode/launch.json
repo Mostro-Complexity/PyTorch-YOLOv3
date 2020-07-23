@@ -5,6 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Generate Config",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceRoot}/config/gen_config.py",
+            "console": "integratedTerminal",
+            "args": [
+                "-o=config",
+                "--training_annotations_path=data/tiny_set/erase_with_uncertain_dataset/annotations/corner/task/tiny_set_train_sw640_sh512_all.json"
+            ]
+        },
+        {
             "name": "Training",
             "type": "python",
             "request": "launch",
@@ -13,7 +24,7 @@
             "args": [
                 "--num_workers=0",
                 "--num_classes=3",
-                "--config=yolov3-config-tiny-persion.yaml",
+                "--config=config/yolov3-config-tiny-person.yaml",
                 "--training_images_dir_path=data/tiny_set/erase_with_uncertain_dataset/train",
                 "--training_annotations_path=data/tiny_set/erase_with_uncertain_dataset/annotations/corner/task/tiny_set_train_sw640_sh512_all.json"
             ]
